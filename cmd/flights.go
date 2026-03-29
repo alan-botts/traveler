@@ -13,6 +13,8 @@ import (
 	"traveler/internal/tui"
 )
 
+var headless bool
+
 var flightsCmd = &cobra.Command{
 	Use:   "flights <origin> <destination> <date>",
 	Short: "Search for one-way flights",
@@ -22,6 +24,7 @@ var flightsCmd = &cobra.Command{
 }
 
 func init() {
+	flightsCmd.Flags().BoolVar(&headless, "headless", false, "Print results to stdout instead of launching TUI")
 	rootCmd.AddCommand(flightsCmd)
 }
 
@@ -56,6 +59,25 @@ func runFlights(cmd *cobra.Command, args []string) error {
 
 	if len(flights) == 0 {
 		fmt.Println("No flights found.")
+		return nil
+	}
+
+	if headless {
+		// Print results to stdout.
+		fmt.Printf("\nFound %d flights: %s → %s on %s\n\n", len(flights), origin, destination, date)
+		for i, f := range flights {
+			fmt.Printf("--- Flight %d ---\n", i+1)
+			fmt.Printf("  Price:    $%.0f\n", f.Price)
+			fmt.Printf("  Duration: %dh %dm\n", f.TotalDuration/60, f.TotalDuration%60)
+			for _, leg := range f.Legs {
+				fmt.Printf("  %s %s  %s %02d:%02d → %s %02d:%02d (%dh %dm)\n",
+					leg.AirlineCode, leg.FlightNum,
+					leg.DepAirport, leg.DepTime[0], leg.DepTime[1],
+					leg.ArrAirport, leg.ArrTime[0], leg.ArrTime[1],
+					leg.Duration/60, leg.Duration%60)
+			}
+			fmt.Println()
+		}
 		return nil
 	}
 
