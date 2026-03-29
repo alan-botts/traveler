@@ -1,4 +1,4 @@
-module traveler
+module github.com/alan-botts/traveler
 
 go 1.23.0
 

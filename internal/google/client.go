@@ -25,7 +25,7 @@ type Client struct {
 }
 
 // NewClient creates a Client with Chrome TLS fingerprint.
-func NewClient() *Client {
+func NewClient() (*Client, error) {
 	jar := tls_client.NewCookieJar()
 	options := []tls_client.HttpClientOption{
 		tls_client.WithTimeoutSeconds(30),
@@ -36,13 +36,12 @@ func NewClient() *Client {
 
 	client, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(), options...)
 	if err != nil {
-		// Fallback: this should not happen with valid options.
-		panic(fmt.Sprintf("failed to create TLS client: %v", err))
+		return nil, fmt.Errorf("failed to create TLS client: %w", err)
 	}
 
 	return &Client{
 		httpClient: client,
-	}
+	}, nil
 }
 
 // SearchFlights searches for one-way flights and returns parsed results.

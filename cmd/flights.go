@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"traveler/internal/google"
-	"traveler/internal/tui"
+	"github.com/alan-botts/traveler/internal/google"
+	"github.com/alan-botts/traveler/internal/tui"
 )
 
 var headless bool
@@ -50,7 +50,10 @@ func runFlights(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Searching flights: %s -> %s on %s...\n", origin, destination, date)
 
-	client := google.NewClient()
+	client, err := google.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
 
 	flights, err := client.SearchFlights(origin, destination, date)
 	if err != nil {

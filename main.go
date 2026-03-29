@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"traveler/cmd"
+	"github.com/alan-botts/traveler/cmd"
 )
 
 func main() {
