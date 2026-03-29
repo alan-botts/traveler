@@ -1,14 +1,65 @@
 # traveler
 
-A flight search CLI built with Go, Cobra, and Bubbletea. Searches Google Flights for one-way flights and displays results in an interactive terminal UI or headless text output.
+A command-line tool that searches Google Flights using their undocumented internal API. It uses TLS fingerprinting to mimic a real Chrome browser, so Google's servers treat requests as legitimate browser traffic. Results are displayed in an interactive terminal UI (via [Bubbletea](https://github.com/charmbracelet/bubbletea)) or printed as plain text for scripting.
 
-## Install
+## Example
 
-```bash
-go install github.com/alan-botts/traveler@latest
+```
+$ ./travel flights PHX OAK 2026-04-01 --headless
+Searching flights: PHX -> OAK on 2026-04-01...
+
+Found 12 flights: PHX → OAK on 2026-04-01
+
+--- Flight 1 ---
+  Price:    $258
+  Duration: 2h 5m
+  WN 1188  PHX 19:30 → OAK 21:35 (2h 5m)
+
+--- Flight 2 ---
+  Price:    $258
+  Duration: 2h 5m
+  WN 2746  PHX 21:15 → OAK 23:20 (2h 5m)
+
+--- Flight 3 ---
+  Price:    $268
+  Duration: 4h 13m
+  DL 1451  PHX 19:33 → SLC 22:15 (1h 42m)
+  DL 3797  SLC 22:50 → OAK 23:46 (1h 56m)
+
+--- Flight 4 ---
+  Price:    $278
+  Duration: 2h 15m
+  WN 1787  PHX 08:50 → OAK 11:05 (2h 15m)
+
+--- Flight 5 ---
+  Price:    $278
+  Duration: 2h 10m
+  WN 1667  PHX 11:05 → OAK 13:15 (2h 10m)
 ```
 
-Or build from source:
+## Features
+
+- **Real Google Flights data** -- queries the same internal API that google.com/travel/flights uses
+- **TLS fingerprinting** -- presents a Chrome 131 TLS fingerprint so requests are indistinguishable from browser traffic
+- **Interactive TUI** -- browse results with keyboard navigation (j/k, arrows, Home/End)
+- **Headless mode** -- `--headless` flag prints plain text for piping into scripts, `jq`, `grep`, etc.
+- **One-way flight search** -- specify origin, destination, and date with standard IATA airport codes
+- **Rate limiting** -- built-in rate limiter (10 req/s) to avoid hammering Google's servers
+- **No API key required** -- no accounts, tokens, or configuration needed
+
+## Installation
+
+Requires **Go 1.23** or later.
+
+### macOS
+
+Install Go via Homebrew if you don't have it:
+
+```bash
+brew install go
+```
+
+Then build traveler:
 
 ```bash
 git clone https://github.com/alan-botts/traveler.git
@@ -16,29 +67,126 @@ cd traveler
 go build -o travel .
 ```
 
-## Usage
+The `travel` binary is now in the current directory. Move it somewhere on your PATH if you like:
 
 ```bash
-# Interactive TUI
-./travel flights PHX OAK 2026-04-01
-
-# Headless (for scripts/piping)
-./travel flights PHX OAK 2026-04-01 --headless
+sudo mv travel /usr/local/bin/
 ```
 
-Arguments:
-- `origin` — 3-letter IATA airport code (e.g. PHX, SFO, JFK)
-- `destination` — 3-letter IATA airport code
-- `date` — travel date in YYYY-MM-DD format
+### Ubuntu / Debian
 
-## How it works
+Install Go (option A -- snap):
 
-Traveler queries Google Flights' internal API endpoints (the same ones the Google Flights web UI uses) via TLS-fingerprinted HTTP requests.
+```bash
+sudo snap install go --classic
+```
+
+Or (option B -- from the official tarball):
+
+```bash
+# Download Go 1.23+ from https://go.dev/dl/
+wget https://go.dev/dl/go1.23.6.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.23.6.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then build:
+
+```bash
+git clone https://github.com/alan-botts/traveler.git
+cd traveler
+go build -o travel .
+```
+
+### One-liner with `go install`
+
+If you already have Go configured:
+
+```bash
+go install github.com/alan-botts/traveler@latest
+```
+
+This installs the binary as `traveler` in your `$GOPATH/bin` (or `$HOME/go/bin`). Rename it if you prefer:
+
+```bash
+mv "$(go env GOPATH)/bin/traveler" "$(go env GOPATH)/bin/travel"
+```
+
+## Usage
+
+```
+travel flights <origin> <destination> <date> [flags]
+```
+
+### Arguments
+
+| Argument      | Description                              | Example      |
+|---------------|------------------------------------------|--------------|
+| `origin`      | 3-letter IATA airport code (departure)   | `PHX`, `SFO` |
+| `destination` | 3-letter IATA airport code (arrival)     | `OAK`, `JFK` |
+| `date`        | Travel date in YYYY-MM-DD format         | `2026-04-01`  |
+
+### Flags
+
+| Flag         | Description                                        |
+|--------------|----------------------------------------------------|
+| `--headless` | Print results as plain text instead of launching TUI |
+
+### Examples
+
+```bash
+# Interactive TUI -- browse results with keyboard
+./travel flights SFO JFK 2026-05-15
+
+# Headless -- plain text output for scripts
+./travel flights LAX ORD 2026-06-01 --headless
+
+# Pipe to grep to find nonstop flights under $300
+./travel flights PHX OAK 2026-04-01 --headless | grep -A3 "Flight" | grep "Price"
+```
+
+### TUI Controls
+
+| Key              | Action              |
+|------------------|---------------------|
+| `j` / `Down`     | Move cursor down    |
+| `k` / `Up`       | Move cursor up      |
+| `g` / `Home`     | Jump to first result|
+| `G` / `End`      | Jump to last result |
+| `q` / `Esc`      | Quit                |
+
+## How It Works
+
+Google Flights has no public API. The web UI at google.com/travel/flights communicates with an internal RPC endpoint. Traveler reverse-engineers that protocol:
+
+1. **Request encoding** -- The search parameters (airports, date, trip type, passenger count) are packed into a deeply nested JSON array, then double-encoded: the inner structure is JSON-stringified, wrapped in `[null, "<json>"]`, JSON-stringified again, URL-encoded, and sent as `f.req=...` in a POST body.
+
+2. **TLS fingerprinting** -- Google checks TLS handshake characteristics (cipher suites, extensions, ordering) to distinguish real browsers from bots. Traveler uses [bogdanfinn/tls-client](https://github.com/bogdanfinn/tls-client) to present Chrome 131's exact TLS fingerprint, making requests look identical to a real browser at the network level.
+
+3. **Response decoding** -- The response is also multi-layered: a XSSI prevention prefix (`)]}'`) is stripped, the outer JSON is parsed, and then an inner JSON string at `[0][2]` is parsed again to reach the actual flight data. Flight itineraries are extracted from deeply nested array indices (there is no schema -- positions were mapped by hand).
+
+4. **Rate limiting** -- A mutex-protected rate limiter caps requests at 10/second to be a polite client.
 
 ## Disclaimer
 
-This tool accesses Google's undocumented internal API and uses TLS fingerprinting to impersonate a browser. This may violate Google's Terms of Service. Use at your own risk and for personal/educational purposes only. The authors are not responsible for any consequences of using this tool.
+This tool accesses Google's **undocumented internal API** and uses TLS fingerprinting to impersonate a browser. This may violate [Google's Terms of Service](https://policies.google.com/terms). Use at your own risk and for **personal or educational purposes only**. The authors are not responsible for any consequences of using this tool.
+
+Google may change their API structure, response format, or fingerprinting detection at any time, which could break this tool without notice.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT -- see [LICENSE](LICENSE).
+
+## Contributing
+
+Contributions are welcome. Feel free to open issues or submit pull requests.
+
+Some areas that could use work:
+
+- Round-trip flight search
+- Additional sort options (duration, departure time)
+- Output formats (JSON, CSV)
+- Airport code autocomplete/validation against a real IATA database
+- Caching results to avoid redundant requests
