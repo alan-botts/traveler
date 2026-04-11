@@ -5,36 +5,35 @@ A command-line tool that searches Google Flights using their undocumented intern
 ## Example
 
 ```
-$ ./travel flights PHX OAK 2026-04-01 --headless
-Searching flights: PHX -> OAK on 2026-04-01...
+$ ./travel flights LAX SFO 2026-04-17 --headless
+Searching flights: LAX -> SFO on 2026-04-17...
 
-Found 12 flights: PHX → OAK on 2026-04-01
+Found 36 flights: LAX → SFO on 2026-04-17
 
 --- Flight 1 ---
-  Price:    $258
-  Duration: 2h 5m
-  WN 1188  PHX 19:30 → OAK 21:35 (2h 5m)
+  Price:    $108
+  Duration: 1h 38m
+  F9 2857  LAX 20:01 → SFO 21:39 (1h 38m)
 
 --- Flight 2 ---
-  Price:    $258
-  Duration: 2h 5m
-  WN 2746  PHX 21:15 → OAK 23:20 (2h 5m)
+  Price:    $185
+  Duration: 1h 30m
+  WN 1105  LAX 00:00 → SFO 07:30 (1h 30m)
 
 --- Flight 3 ---
-  Price:    $268
-  Duration: 4h 13m
-  DL 1451  PHX 19:33 → SLC 22:15 (1h 42m)
-  DL 3797  SLC 22:50 → OAK 23:46 (1h 56m)
+  Price:    $185
+  Duration: 1h 25m
+  DL 1421  LAX 06:20 → SFO 07:45 (1h 25m)
 
 --- Flight 4 ---
-  Price:    $278
-  Duration: 2h 15m
-  WN 1787  PHX 08:50 → OAK 11:05 (2h 15m)
+  Price:    $185
+  Duration: 1h 34m
+  UA 1372  LAX 07:15 → SFO 08:49 (1h 34m)
 
 --- Flight 5 ---
-  Price:    $278
-  Duration: 2h 10m
-  WN 1667  PHX 11:05 → OAK 13:15 (2h 10m)
+  Price:    $185
+  Duration: 1h 25m
+  DL 1715  LAX 08:25 → SFO 09:50 (1h 25m)
 ```
 
 ## Features
@@ -124,9 +123,9 @@ travel flights <origin> <destination> <date> [flags]
 
 | Argument      | Description                              | Example      |
 |---------------|------------------------------------------|--------------|
-| `origin`      | 3-letter IATA airport code (departure)   | `PHX`, `SFO` |
-| `destination` | 3-letter IATA airport code (arrival)     | `OAK`, `JFK` |
-| `date`        | Travel date in YYYY-MM-DD format         | `2026-04-01`  |
+| `origin`      | 3-letter IATA airport code (departure)   | `LAX`, `JFK` |
+| `destination` | 3-letter IATA airport code (arrival)     | `SFO`, `ORD` |
+| `date`        | Travel date in YYYY-MM-DD format         | `2026-04-17`  |
 
 ### Flags
 
@@ -138,13 +137,13 @@ travel flights <origin> <destination> <date> [flags]
 
 ```bash
 # Interactive TUI -- browse results with keyboard
-./travel flights SFO JFK 2026-05-15
+./travel flights LAX SFO 2026-05-15
 
 # Headless -- plain text output for scripts
-./travel flights LAX ORD 2026-06-01 --headless
+./travel flights LAX SFO 2026-06-01 --headless
 
 # Pipe to grep to find nonstop flights under $300
-./travel flights PHX OAK 2026-04-01 --headless | grep -A3 "Flight" | grep "Price"
+./travel flights LAX SFO 2026-04-17 --headless | grep -A3 "Flight" | grep "Price"
 ```
 
 ### TUI Controls
