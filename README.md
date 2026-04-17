@@ -1,5 +1,7 @@
 # traveler
 
+Part of the **alan-botts tools** family: [movie-watcher](https://github.com/alan-botts/movie-watcher) | [divine](https://github.com/alan-botts/divine) | [strangerloops.com/tools](https://strangerloops.com/tools/)
+
 A command-line tool that searches Google Flights using their undocumented internal API. It uses TLS fingerprinting to mimic a real Chrome browser, so Google's servers treat requests as legitimate browser traffic. Results are displayed in an interactive terminal UI (via [Bubbletea](https://github.com/charmbracelet/bubbletea)) or printed as plain text for scripting.
 
 ## Example
