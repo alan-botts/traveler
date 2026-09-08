@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -44,7 +45,8 @@ func runFlights(cmd *cobra.Command, args []string) error {
 
 	// Validate date format.
 	dateRe := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-	if !dateRe.MatchString(date) {
+	_, dateErr := time.Parse("2006-01-02", date)
+	if !dateRe.MatchString(date) || dateErr != nil {
 		return fmt.Errorf("invalid date format: %s (expected YYYY-MM-DD)", date)
 	}
 
@@ -70,13 +72,13 @@ func runFlights(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\nFound %d flights: %s → %s on %s\n\n", len(flights), origin, destination, date)
 		for i, f := range flights {
 			fmt.Printf("--- Flight %d ---\n", i+1)
-			fmt.Printf("  Price:    $%.0f\n", f.Price)
+			fmt.Printf("  Price:    USD $%.0f (one way)\n", f.Price)
 			fmt.Printf("  Duration: %dh %dm\n", f.TotalDuration/60, f.TotalDuration%60)
 			for _, leg := range f.Legs {
-				fmt.Printf("  %s %s  %s %02d:%02d → %s %02d:%02d (%dh %dm)\n",
+				fmt.Printf("  %s %s  %s %04d-%02d-%02d %02d:%02d → %s %04d-%02d-%02d %02d:%02d (%dh %dm)\n",
 					leg.AirlineCode, leg.FlightNum,
-					leg.DepAirport, leg.DepTime[0], leg.DepTime[1],
-					leg.ArrAirport, leg.ArrTime[0], leg.ArrTime[1],
+					leg.DepAirport, leg.DepDate[0], leg.DepDate[1], leg.DepDate[2], leg.DepTime[0], leg.DepTime[1],
+					leg.ArrAirport, leg.ArrDate[0], leg.ArrDate[1], leg.ArrDate[2], leg.ArrTime[0], leg.ArrTime[1],
 					leg.Duration/60, leg.Duration%60)
 			}
 			fmt.Println()

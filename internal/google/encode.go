@@ -19,7 +19,7 @@ import (
 func BuildRequestBody(origin, destination, date string) (string, error) {
 	// Build the flight segment.
 	segment := []interface{}{
-		[]interface{}{[]interface{}{[]interface{}{origin, 0}}},   // departure airport
+		[]interface{}{[]interface{}{[]interface{}{origin, 0}}},      // departure airport
 		[]interface{}{[]interface{}{[]interface{}{destination, 0}}}, // arrival airport
 		nil, // time restrictions
 		0,   // max_stops: 0 = ANY
@@ -37,11 +37,11 @@ func BuildRequestBody(origin, destination, date string) (string, error) {
 		[]interface{}{},
 		[]interface{}{
 			nil, nil,
-			2,                      // trip_type: 2 = ONE_WAY
+			2, // trip_type: 2 = ONE_WAY
 			nil, []interface{}{},
-			1,                      // seat_type: 1 = ECONOMY
+			1,                         // seat_type: 1 = ECONOMY
 			[]interface{}{1, 0, 0, 0}, // passengers: 1 adult
-			nil,                    // price limit
+			nil,                       // price limit
 			nil, nil, nil, nil, nil,
 			[]interface{}{segment}, // flight segments
 			nil, nil, nil, 1,

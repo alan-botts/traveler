@@ -2,7 +2,7 @@
 
 Part of the **alan-botts tools** family: [movie-watcher](https://github.com/alan-botts/movie-watcher) | [divine](https://github.com/alan-botts/divine) | [strangerloops.com/tools](https://strangerloops.com/tools/)
 
-A command-line tool that searches Google Flights using their undocumented internal API. It uses TLS fingerprinting to mimic a real Chrome browser, so Google's servers treat requests as legitimate browser traffic. Results are displayed in an interactive terminal UI (via [Bubbletea](https://github.com/charmbracelet/bubbletea)) or printed as plain text for scripting.
+A command-line tool that searches Google Flights using their undocumented internal API. It uses TLS fingerprinting to mimic a real Chrome browser, so Google's servers treat requests as legitimate browser traffic. If the RPC fails, it falls back to the flight data embedded in the public Google Flights search page and verifies that Google understood the requested route and date. Results are displayed in an interactive terminal UI (via [Bubbletea](https://github.com/charmbracelet/bubbletea)) or printed as plain text for scripting.
 
 ## Example
 
@@ -46,6 +46,7 @@ Found 36 flights: LAX → SFO on 2026-04-17
 - **Headless mode** -- `--headless` flag prints plain text for piping into scripts, `jq`, `grep`, etc.
 - **One-way flight search** -- specify origin, destination, and date with standard IATA airport codes
 - **Rate limiting** -- built-in rate limiter (10 req/s) to avoid hammering Google's servers
+- **International dates** -- headless output includes local departure/arrival dates and handles omitted zero-minute values. Prices are USD, one-way, for one adult in economy; fares are search quotes, not booking confirmations.
 - **No API key required** -- no accounts, tokens, or configuration needed
 
 ## Installation
@@ -191,3 +192,13 @@ Some areas that could use work:
 - Output formats (JSON, CSV)
 - Airport code autocomplete/validation against a real IATA database
 - Caching results to avoid redundant requests
+
+## Verification
+
+Run `go test ./...` and `go vet ./...`. Regression fixtures cover RPC error
+envelopes, metadata preceding results, malformed/empty responses, search-page
+query verification, and whole-hour/midnight times. The compact shopping fixture
+is derived from a public Google Flights response with booking tokens removed.
+
+Both transports use undocumented Google formats and may change. If neither
+returns valid data, the CLI reports both errors instead of inventing fares.

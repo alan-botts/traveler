@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	flightsURL = "https://www.google.com/_/FlightsFrontendUi/data/travel.frontend.flights.FlightsFrontendService/GetShoppingResults"
+	flightsURL = "https://www.google.com/_/FlightsFrontendUi/data/travel.frontend.flights.FlightsFrontendService/GetShoppingResults?hl=en&gl=US&curr=USD"
 	maxRPS     = 10
 )
 
@@ -46,6 +46,18 @@ func NewClient() (*Client, error) {
 
 // SearchFlights searches for one-way flights and returns parsed results.
 func (c *Client) SearchFlights(origin, destination, date string) ([]Flight, error) {
+	flights, rpcErr := c.searchRPC(origin, destination, date)
+	if rpcErr == nil {
+		return flights, nil
+	}
+	flights, pageErr := c.searchPage(origin, destination, date)
+	if pageErr != nil {
+		return nil, fmt.Errorf("RPC: %v; search page: %w", rpcErr, pageErr)
+	}
+	return flights, nil
+}
+
+func (c *Client) searchRPC(origin, destination, date string) ([]Flight, error) {
 	c.rateLimit()
 
 	body, err := BuildRequestBody(origin, destination, date)

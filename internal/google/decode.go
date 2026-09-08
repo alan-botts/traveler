@@ -16,32 +16,35 @@ import (
 //  4. JSON parse that inner string
 //  5. Best flights at [2][0], other flights at [3][0]
 func ParseResponse(body []byte) ([]Flight, error) {
-	// Step 1: Strip XSSI prefix.
-	text := string(body)
-	if idx := strings.Index(text, "\n"); idx != -1 {
-		text = text[idx+1:]
-	}
-
-	// Step 2: Parse outer JSON.
+	text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(body)), ")]}'"))
 	var outer []interface{}
 	if err := json.Unmarshal([]byte(text), &outer); err != nil {
 		return nil, fmt.Errorf("parse outer JSON: %w", err)
 	}
-
-	// Step 3: Navigate to outer[0][2] which is an inner JSON string.
-	first, ok := outer[0].([]interface{})
-	if !ok || len(first) < 3 {
-		return nil, fmt.Errorf("unexpected outer structure: cannot index [0]")
+	for _, value := range outer {
+		frame, ok := value.([]interface{})
+		if !ok || len(frame) < 3 || frame[0] != "wrb.fr" {
+			continue
+		}
+		payload, ok := frame[2].(string)
+		if !ok {
+			if len(frame) > 5 {
+				return nil, fmt.Errorf("Google Flights RPC error: %v", frame[5])
+			}
+			return nil, fmt.Errorf("Google Flights RPC missing result payload")
+		}
+		var inner []interface{}
+		if err := json.Unmarshal([]byte(payload), &inner); err != nil {
+			return nil, fmt.Errorf("parse inner JSON: %w", err)
+		}
+		return parseResults(inner)
 	}
-	innerStr, ok := first[2].(string)
-	if !ok {
-		return nil, fmt.Errorf("outer[0][2] is not a string")
-	}
+	return nil, fmt.Errorf("Google Flights response missing result frame")
+}
 
-	// Step 4: Parse the inner JSON string.
-	var inner []interface{}
-	if err := json.Unmarshal([]byte(innerStr), &inner); err != nil {
-		return nil, fmt.Errorf("parse inner JSON: %w", err)
+func parseResults(inner []interface{}) ([]Flight, error) {
+	if len(inner) < 4 {
+		return nil, fmt.Errorf("Google Flights result is incomplete")
 	}
 
 	var flights []Flight
@@ -101,7 +104,7 @@ func parseFlight(data interface{}, category string) (Flight, error) {
 					for _, legRaw := range legs {
 						leg, err := parseLeg(legRaw)
 						if err != nil {
-							continue
+							return Flight{}, err
 						}
 						flight.Legs = append(flight.Legs, leg)
 					}
@@ -121,6 +124,9 @@ func parseFlight(data interface{}, category string) (Flight, error) {
 		}
 	}
 
+	if len(flight.Legs) == 0 || flight.TotalDuration <= 0 || flight.Price <= 0 {
+		return Flight{}, fmt.Errorf("incomplete or unpriced itinerary")
+	}
 	return flight, nil
 }
 
@@ -179,6 +185,9 @@ func parseLeg(data interface{}) (Leg, error) {
 		leg.Duration = toInt(v)
 	}
 
+	if len(leg.DepAirport) != 3 || len(leg.ArrAirport) != 3 || leg.DepDate[0] == 0 || leg.ArrDate[0] == 0 || leg.Duration <= 0 {
+		return Leg{}, fmt.Errorf("incomplete flight leg")
+	}
 	return leg, nil
 }
 
@@ -230,8 +239,12 @@ func toIntTriple(v interface{}) [3]int {
 
 func toIntPair(v interface{}) [2]int {
 	arr, ok := v.([]interface{})
-	if !ok || len(arr) < 2 {
+	if !ok || len(arr) == 0 {
 		return [2]int{}
 	}
-	return [2]int{toInt(arr[0]), toInt(arr[1])}
+	result := [2]int{toInt(arr[0]), 0}
+	if len(arr) > 1 {
+		result[1] = toInt(arr[1])
+	}
+	return result
 }
