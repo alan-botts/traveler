@@ -62,6 +62,20 @@ func at(value interface{}, path ...int) interface{} {
 	return value
 }
 
+// Google sometimes resolves BER to the Berlin city rather than the airport.
+// Accept only that known city entity, then verify the actual flight endpoints.
+func pageAirportMatches(entity interface{}, airport string) (city bool, ok bool) {
+	code := at(entity, 0)
+	kind := at(entity, 1)
+	if code == airport && kind == float64(0) {
+		return false, true
+	}
+	if airport == "BER" && code == "/m/0156q" && kind == float64(4) {
+		return true, true
+	}
+	return false, false
+}
+
 func parsePage(body []byte, origin, destination, date string) ([]Flight, error) {
 	context, err := pageData(body, "ds:0")
 	if err != nil {
@@ -73,13 +87,31 @@ func parsePage(body []byte, origin, destination, date string) ([]Flight, error) 
 	segments, ok := at(filters, 13).([]interface{})
 	if !ok || len(segments) != 1 || at(filters, 2) != float64(2) ||
 		at(filters, 5) != float64(1) || at(filters, 6, 0) != float64(1) ||
-		at(segments, 0, 0, 0, 0, 0) != origin || at(segments, 0, 1, 0, 0, 0) != destination ||
 		at(segments, 0, 6) != date {
+		return nil, fmt.Errorf("search page does not match requested one-way economy itinerary")
+	}
+	originCity, originOK := pageAirportMatches(at(segments, 0, 0, 0, 0), origin)
+	destinationCity, destinationOK := pageAirportMatches(at(segments, 0, 1, 0, 0), destination)
+	if !originOK || !destinationOK {
 		return nil, fmt.Errorf("search page does not match requested one-way economy itinerary")
 	}
 	data, err := pageData(body, "ds:1")
 	if err != nil {
 		return nil, err
 	}
-	return parseResults(data)
+	flights, err := parseResults(data)
+	if err != nil || (!originCity && !destinationCity) {
+		return flights, err
+	}
+	// A city query may include nearby airports. Never show one as a BER fare.
+	var matched []Flight
+	for _, flight := range flights {
+		if flight.Legs[0].DepAirport == origin && flight.Legs[len(flight.Legs)-1].ArrAirport == destination {
+			matched = append(matched, flight)
+		}
+	}
+	if len(flights) > 0 && len(matched) == 0 {
+		return nil, fmt.Errorf("search page city results do not match requested airports")
+	}
+	return matched, nil
 }

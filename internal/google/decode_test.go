@@ -63,3 +63,63 @@ func TestPageMatchesRequestedSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestPageBERCityResolution(t *testing.T) {
+	results := fixture(t)
+	var data []interface{}
+	if err := json.Unmarshal([]byte(results), &data); err != nil {
+		t.Fatal(err)
+	}
+	flight := at(data, 2, 0, 0, 0, 2, 1).([]interface{})
+	flight[6] = "BER"
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	context := `[null,[2,[null,null,2,null,[],1,[1,0,0,0],null,null,null,null,null,null,[[[[["SFO",0]]],[[["/m/0156q",4]]],null,0,null,null,"2026-10-06",null,null,null,null,null,null,null,3]]]]]`
+	page := func(ctx string) []byte {
+		return []byte("<script>AF_initDataCallback({key: 'ds:0', data:" + ctx + ", sideChannel: {}});AF_initDataCallback({key: 'ds:1', data:" + string(encoded) + ", sideChannel: {}});</script>")
+	}
+	flights, err := parsePage(page(context), "SFO", "BER", "2026-10-06")
+	if err != nil || len(flights) != 1 || flights[0].Legs[len(flights[0].Legs)-1].ArrAirport != "BER" {
+		t.Fatalf("BER city result failed: %v %v", flights, err)
+	}
+	for _, tc := range []struct{ name, ctx, origin, destination string }{
+		{"wrong city", strings.Replace(context, "/m/0156q", "/m/other", 1), "SFO", "BER"},
+		{"wrong city type", strings.Replace(context, `"/m/0156q",4`, `"/m/0156q",0`, 1), "SFO", "BER"},
+		{"city for other airport", context, "SFO", "TXL"},
+		{"wrong origin", context, "LAX", "BER"},
+		{"wrong date", strings.Replace(context, "2026-10-06", "2026-10-07", 1), "SFO", "BER"},
+		{"round trip", strings.Replace(context, `null,null,2,null`, `null,null,1,null`, 1), "SFO", "BER"},
+		{"business cabin", strings.Replace(context, `[],1,[1,0,0,0]`, `[],2,[1,0,0,0]`, 1), "SFO", "BER"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parsePage(page(tc.ctx), tc.origin, tc.destination, "2026-10-06"); err == nil {
+				t.Fatal("accepted mismatched itinerary")
+			}
+		})
+	}
+
+	// A city result can contain a nearby airport; it must not be advertised as BER.
+	flight[6] = "SXF"
+	encoded, _ = json.Marshal(data)
+	if _, err := parsePage(page(context), "SFO", "BER", "2026-10-06"); err == nil {
+		t.Fatal("accepted flight to a different airport")
+	}
+	flight[6] = "BER"
+	departure := at(data, 2, 0, 0, 0, 2, 0).([]interface{})
+	departure[3] = "LAX"
+	encoded, _ = json.Marshal(data)
+	if _, err := parsePage(page(context), "SFO", "BER", "2026-10-06"); err == nil {
+		t.Fatal("accepted flight from a different airport")
+	}
+
+	departure[3] = "BER"
+	flight[6] = "SUB"
+	encoded, _ = json.Marshal(data)
+	fromBER := strings.Replace(context, `[[["SFO",0]]],[[["/m/0156q",4]]]`, `[[["/m/0156q",4]]],[[["SUB",0]]]`, 1)
+	flights, err = parsePage(page(fromBER), "BER", "SUB", "2026-10-06")
+	if err != nil || len(flights) != 1 || flights[0].Legs[0].DepAirport != "BER" {
+		t.Fatalf("BER city origin failed: %v %v", flights, err)
+	}
+}
